@@ -1,4 +1,4 @@
-# Physics-Guided AI for Proactive Methane Leak Detection in Coal Mines
+# Physics-Boosted AI for Proactive Methane Leak Detection in Coal Mines
 
 ## Overview
 This project demonstrates a physics-guided machine learning approach for early detection of methane leaks in coal mines. Traditional threshold-based methods detect leaks only after they become severe, while our model integrates domain knowledge, sensor data, and site-specific geological features to detect precursors, allowing proactive intervention.
@@ -18,7 +18,8 @@ This project demonstrates a physics-guided machine learning approach for early d
 ## 📁 Repository Structure
 ```
 .
-├── enhanced_methane_leak_ai.py      # Main script with simulation, model, and plots
+├── demo_default.py      # Main script with simulation, model, and plots
+├── demo_pde.py      # Main script with simulation, model, and plots
 ├── README.md                        # This file
 ├── data/                            # Folder for future real-world data
 │   ├── EPA_methane_flux.nc          # Placeholder NetCDF file (not included)
