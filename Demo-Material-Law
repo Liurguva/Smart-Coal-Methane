@@ -1,0 +1,91 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+
+# Simulate monthly methane emissions over 10 years (120 months)
+np.random.seed(42)
+months = pd.date_range(start='2012-01-01', periods=120, freq='M')
+base_flux = 50 + 5 * np.sin(np.linspace(0, 10 * np.pi, 120)) + np.random.normal(0, 2, 120)
+
+# Simulate leak events with precursors and spike
+leak_months = np.array([20, 45, 70, 95])
+flux = base_flux.copy()
+for lm in leak_months:
+    flux[lm - 2:lm] += np.linspace(3, 8, 2)      # precursor
+    flux[lm] += 20                               # spike
+    flux[lm + 1:lm + 3] += np.linspace(8, 3, 2)  # decay
+
+# Create DataFrame
+df = pd.DataFrame({'flux': flux}, index=months)
+df['flux_anomaly'] = df['flux'] - df['flux'].rolling(12, center=True).mean()
+df['d_flux'] = df['flux_anomaly'].diff()
+
+# Add geological/geophysical features
+df['seam_depth'] = 300 + 30 * np.sin(np.linspace(0, 12, len(df)))             # in meters
+df['porosity'] = 0.05 + 0.01 * np.cos(np.linspace(0, 6, len(df)))             # unitless
+df['fault_proximity'] = np.random.uniform(0, 1, len(df))                      # normalized
+
+# Add physics: simplified gas transport (Darcy's Law proxy)
+permeability = np.random.uniform(1e-15, 1e-13, len(df))                       # m^2
+viscosity = 1.1e-5                                                            # Pa.s
+pressure_gradient = np.random.uniform(10, 50, len(df))                        # Pa/m
+
+df['gas_transport'] = (permeability * df['porosity'] * pressure_gradient) / (df['seam_depth'] * viscosity)
+
+# Label leak + precursors as '1'
+df['leak'] = 0
+for lm in leak_months:
+    df.loc[df.index[lm - 2:lm + 1], 'leak'] = 1  # early detection window
+
+df = df.dropna()
+
+# Feature set
+features = ['flux', 'flux_anomaly', 'd_flux', 'seam_depth', 'porosity',
+            'fault_proximity', 'gas_transport']
+X, y = df[features], df['leak']
+
+# Train physics-guided AI model
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X, y)
+df['ai_physics_pred'] = model.predict(X)
+
+# Traditional detection method (threshold on flux)
+threshold = df['flux'].mean() + 2.5 * df['flux'].std()
+df['threshold_pred'] = (df['flux'] > threshold).astype(int)
+
+# Evaluate models
+print("\n=== Physics-Guided AI ===")
+print(classification_report(df['leak'], df['ai_physics_pred'], zero_division=0))
+
+print("\n=== Traditional Threshold ===")
+print(classification_report(df['leak'], df['threshold_pred'], zero_division=0))
+
+# Compute average proactive lead time
+lead_times = []
+for lm in leak_months:
+    window = df.iloc[lm - 2:lm + 1]
+    ai_hits = window[window['ai_physics_pred'] == 1]
+    if not ai_hits.empty:
+        lead_time = lm - df.index.get_loc(ai_hits.index[0])
+        lead_times.append(lead_time)
+
+if lead_times:
+    print(f"\nAverage Proactive Lead Time (months): {np.mean(lead_times):.2f}")
+else:
+    print("\nAverage Proactive Lead Time: 0 (no early detections)")
+
+# Plot results
+plt.figure(figsize=(14, 6))
+plt.plot(df.index, df['flux'], label='Methane Flux', color='gray')
+plt.scatter(df[df['leak'] == 1].index, df[df['leak'] == 1]['flux'], color='red', label='True Leak (with Precursors)', zorder=5)
+plt.scatter(df[df['ai_physics_pred'] == 1].index, df[df['ai_physics_pred'] == 1]['flux'], marker='x', color='green', label='Physics-AI Prediction', zorder=5)
+plt.scatter(df[df['threshold_pred'] == 1].index, df[df['threshold_pred'] == 1]['flux'], marker='o', facecolors='none', edgecolors='blue', label='Threshold Prediction', zorder=5)
+plt.title("Methane Leak Detection: Physics-Guided AI vs Traditional Threshold")
+plt.xlabel("Date")
+plt.ylabel("Methane Flux")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
