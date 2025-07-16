@@ -1,0 +1,80 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+
+# Simulate monthly data over 10 years
+np.random.seed(42)
+months = pd.date_range(start='2012-01-01', periods=120, freq='M')
+base_flux = 50 + 5 * np.sin(np.linspace(0, 10 * np.pi, 120)) + np.random.normal(0, 2, 120)
+
+# Inject "precursor + leak" events
+leak_months = np.array([20, 45, 70, 95])
+leak_flux = base_flux.copy()
+for lm in leak_months:
+    leak_flux[lm - 2:lm] += np.linspace(3, 8, 2)  # precursor ramp-up
+    leak_flux[lm] += 20                            # leak spike
+    leak_flux[lm + 1:lm + 3] += np.linspace(8, 3, 2)  # post-leak decay
+
+# DataFrame setup
+df = pd.DataFrame({'flux': leak_flux}, index=months)
+df['flux_anomaly'] = df['flux'] - df['flux'].rolling(12, center=True).mean()
+df['d_flux'] = df['flux_anomaly'].diff()
+
+# Physics/geology-inspired features
+df['seam_depth'] = 300 + 30 * np.sin(np.linspace(0, 12, len(df)))
+df['porosity'] = 0.05 + 0.01 * np.cos(np.linspace(0, 6, len(df)))
+df['fault_proximity'] = np.random.uniform(0, 1, len(df))
+
+# Label: 1 = leak or precursor (AI detects early), 0 = normal
+df['leak'] = 0
+for lm in leak_months:
+    df.loc[df.index[lm - 2:lm + 1], 'leak'] = 1  # early + main leak
+
+df = df.dropna()
+
+# Physics-Guided AI Model
+features = ['flux', 'flux_anomaly', 'd_flux', 'seam_depth', 'porosity', 'fault_proximity']
+X, y = df[features], df['leak']
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X, y)
+df['ai_pred'] = model.predict(X)
+
+# Traditional detection: simple threshold
+threshold = df['flux'].mean() + 2.5 * df['flux'].std()
+df['threshold_pred'] = (df['flux'] > threshold).astype(int)
+
+# Performance comparison
+print("\n=== Physics-Guided AI ===")
+print(classification_report(df['leak'], df['ai_pred'], zero_division=0))
+
+print("\n=== Traditional Method ===")
+print(classification_report(df['leak'], df['threshold_pred'], zero_division=0))
+
+# Average proactive lead time (AI detects before traditional)
+lead_times = []
+for lm in leak_months:
+    idx_range = df.index.get_loc(df.index[lm - 2])
+    window = df.iloc[idx_range:idx_range + 3]
+    ai_hits = window[window['ai_pred'] == 1]
+    traditional_hits = window[window['threshold_pred'] == 1]
+    if not ai_hits.empty:
+        lead_time = (df.index.get_loc(df.index[lm]) - df.index.get_loc(ai_hits.index[0]))
+        lead_times.append(lead_time)
+if lead_times:
+    print(f"\nAverage proactive detection lead time (months): {np.mean(lead_times):.2f}")
+
+# Visualization
+plt.figure(figsize=(14, 6))
+plt.plot(df.index, df['flux'], label='Methane Flux', color='gray')
+plt.scatter(df[df['leak'] == 1].index, df[df['leak'] == 1]['flux'], color='red', label='True Leak (with Precursor)', zorder=9)
+plt.scatter(df[df['ai_pred'] == 1].index, df[df['ai_pred'] == 1]['flux'], marker='x', color='green', label='AI Prediction', zorder=9)
+plt.scatter(df[df['threshold_pred'] == 1].index, df[df['threshold_pred'] == 1]['flux'], marker='o', facecolors='none', edgecolors='blue', label='Threshold Prediction', zorder=9)
+plt.title("Methane Leak Detection: Physics-Guided AI vs Traditional Threshold")
+plt.xlabel("Date")
+plt.ylabel("Methane Flux")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
