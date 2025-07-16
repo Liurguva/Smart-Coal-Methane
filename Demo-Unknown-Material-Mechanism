@@ -1,0 +1,118 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import torch
+from torch import nn
+from sklearn.metrics import classification_report
+
+# --- 1. Simulate synthetic methane emissions data ---
+
+np.random.seed(42)
+months = pd.date_range(start='2012-01-01', periods=120, freq='M')
+flux = 50 + 5 * np.sin(np.linspace(0, 10 * np.pi, 120)) + np.random.normal(0, 2, 120)
+
+# Inject synthetic leak events
+leak_months = [20, 45, 70, 95]
+for lm in leak_months:
+    flux[lm - 2:lm] += np.linspace(3, 8, 2)     # precursor
+    flux[lm] += 20                              # leak spike
+    flux[lm + 1:lm + 3] += np.linspace(8, 3, 2) # decay
+
+df = pd.DataFrame({'flux': flux}, index=months)
+df['flux_anomaly'] = df['flux'] - df['flux'].rolling(12, center=True).mean()
+df['d_flux'] = df['flux_anomaly'].diff()
+
+# Add known geological features
+df['seam_depth'] = 300 + 30 * np.sin(np.linspace(0, 12, len(df)))
+df['porosity'] = 0.05 + 0.01 * np.cos(np.linspace(0, 6, len(df)))
+df['fault_proximity'] = np.random.uniform(0, 1, len(df))
+
+# Define leak label
+df['leak'] = 0
+for lm in leak_months:
+    df.loc[df.index[lm - 2:lm + 1], 'leak'] = 1  # includes precursor
+df = df.dropna()
+
+# Prepare data for training
+features = ['flux', 'flux_anomaly', 'd_flux', 'seam_depth', 'porosity', 'fault_proximity']
+X = torch.tensor(df[features].values, dtype=torch.float32)
+y = torch.tensor(df['leak'].values.reshape(-1, 1), dtype=torch.float32)
+
+# --- 2. Differentiable Physics-Informed Model ---
+
+class InversePhysicsModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # Learnable physics parameters
+        self.log_perm = nn.Parameter(torch.tensor([-30.0]))        # log(permeability)
+        self.log_visc = nn.Parameter(torch.tensor([-10.0]))        # log(viscosity)
+        self.pressure_factor = nn.Parameter(torch.tensor([0.1]))   # scaled pressure gradient
+        # Neural classifier
+        self.net = nn.Sequential(
+            nn.Linear(7, 32),
+            nn.ReLU(),
+            nn.Linear(32, 16),
+            nn.ReLU(),
+            nn.Linear(16, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        # Split input features
+        flux, anomaly, d_flux, seam_depth, porosity, fault = x[:, 0], x[:, 1], x[:, 2], x[:, 3], x[:, 4], x[:, 5]
+        perm = torch.exp(self.log_perm)
+        visc = torch.exp(self.log_visc)
+        dP = self.pressure_factor * (10 + 40 * fault)
+        transport = (perm * porosity * dP) / (seam_depth * visc)
+        transport = transport.view(-1, 1)
+        x_aug = torch.cat([x, transport], dim=1)
+        return self.net(x_aug)
+
+# --- 3. Train Model Using Inverse Analysis ---
+
+model = InversePhysicsModel()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+loss_fn = nn.BCELoss()
+
+for epoch in range(500):
+    model.train()
+    y_pred = model(X)
+    loss = loss_fn(y_pred, y)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    if epoch % 100 == 0:
+        print(f"Epoch {epoch}, Loss: {loss.item():.4f}")
+
+# --- 4. Evaluate Model ---
+
+model.eval()
+with torch.no_grad():
+    y_probs = model(X).numpy().flatten()
+    y_class = (y_probs >= 0.5).astype(int)
+
+df['inv_phys_pred'] = y_class
+
+# Classification report
+print("\n=== Classification Report ===")
+print(classification_report(df['leak'], df['inv_phys_pred']))
+
+# Learned physics parameters
+print("\n=== Learned Physics Parameters ===")
+print(f"Permeability (m^2): {torch.exp(model.log_perm).item():.2e}")
+print(f"Viscosity (Pa.s):   {torch.exp(model.log_visc).item():.2e}")
+print(f"Pressure factor:    {model.pressure_factor.item():.4f}")
+
+# --- 5. Visualize Results ---
+
+plt.figure(figsize=(14, 6))
+plt.plot(df.index, df['flux'], label='Methane Flux', color='gray')
+plt.scatter(df[df['leak'] == 1].index, df[df['leak'] == 1]['flux'], color='red', label='True Leak (with Precursors)', zorder=5)
+plt.scatter(df[df['inv_phys_pred'] == 1].index, df[df['inv_phys_pred'] == 1]['flux'], marker='x', color='green', label='Inverse AI Prediction', zorder=5)
+plt.title("Methane Leak Detection via Inverse Physics-Informed AI")
+plt.xlabel("Date")
+plt.ylabel("Methane Flux")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
