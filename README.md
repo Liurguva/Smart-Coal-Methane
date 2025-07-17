@@ -1,7 +1,7 @@
 # Physics-Boosted AI for Proactive Methane Leak Detection in Coal Mines
 
 ## Overview
-This repository presents physics-boosted AI methods for early detection of methane leaks in coal mines. Traditional threshold-based methods detect leaks only after they become severe, while our models integrate domain knowledge, sensor data, site-specific geological features, and even inverse physics modeling to detect precursors, allowing proactive intervention. To better illustrate the ideas, five simple examples were adopted in which the mine site information, geological information, physics laws, and machine learning algorithms were simplified.
+This repository presents physics-boosted AI methods for early detection of methane leaks in coal mines. Traditional threshold-based methods detect leaks only after they become severe, while our models integrate domain knowledge, sensor data, site-specific geological features, and even inverse physics modeling to detect precursors, allowing proactive intervention. To better illustrate the ideas, five simple examples were adopted in which the mine site information, geological information, physics laws, and machine learning algorithms were simplified. This code is used to showcase the Smart Coalbed Methane research contributed by the research groups of Dr. Andres Clarens and Dr. Leo Liu at the University of Virginia.
 
 ---
 
