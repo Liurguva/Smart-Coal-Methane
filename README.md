@@ -102,6 +102,8 @@ Each script produces time series plots by location:
 - **Green `X`**: AI predictions  
 - **Red dots**: Ground truth leak periods (including precursors)  
 - **Blue circles**: Threshold-based detections
+- <img width="1389" height="590" alt="image" src="https://github.com/user-attachments/assets/91aaa07d-5dfb-4ea1-b5be-c1489c87f284" />
+
 
 ---
 
