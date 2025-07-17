@@ -116,9 +116,9 @@ Each script produces time series plots by location:
   - **Rate of change**: slope of anomaly
   - **Seam depth**, **porosity**, **fault proximity**
 - Optional physics equation:
-  \[
+  $$
   \text{Transport} = \frac{{\text{Permeability} \times \text{Porosity} \times \Delta P}}{{\text{Depth} \times \text{Viscosity}}}
-  \]
+  $$
 
 ### Inverse Modeling
 - Learns unknown material properties using PyTorch and differentiable modeling
