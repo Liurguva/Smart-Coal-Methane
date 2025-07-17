@@ -18,8 +18,11 @@ This project demonstrates a physics-guided machine learning approach for early d
 ## 📁 Repository Structure
 ```
 .
-├── demo_default.py      # Main script with simulation, model, and plots
-├── demo_pde.py      # Main script with simulation, model, and plots
+├── Single-Known-Material.py      # Demo to show how the inclusion of (known) material properties can enhance coal methane leak predictions at a single location
+├── Single-Known-Material-Mechanism.py      #  Demo to show how the inclusion of (known) material properties and transport mechanisms can enhance coal methane leak predictions at a single location
+├── Single-Unknown-Material-Mechanism.py      # Demo to show how the inference of (unknown) material properties and transport mechanisms (using differentiable modeling) can enhance coal methane leak predictions at a single location
+├── Multiple-Known-Material-Mechanism.py      # Demo to show how the inclusion of (known) material properties and transport mechanisms can enhance coal methane leak predictions at multiple locations, which are related by the methane transfer between them
+├── Multiple-Unknown-Material-Mechanism.py      # Demo to show how the inference of (unknown) material properties and transport mechanisms (using differentiable modeling) can enhance coal methane leak predictions at multiple locations, which are related by the methane transfer between them
 ├── README.md                        # This file
 ├── data/                            # Folder for future real-world data
 │   ├── EPA_methane_flux.nc          # Placeholder NetCDF file (not included)
@@ -117,6 +120,6 @@ MIT License. See `LICENSE` file for details.
 
 ## 📬 Contact
 Lead developer: **Leo Liu**, University of Virginia  
-Email: `leo.liu@virginia.edu`  
+Email: `liurguva@gmail.com`  
 
 This project was developed to support coal mine methane management and research initiatives in Virginia and beyond.
