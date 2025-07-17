@@ -1,0 +1,115 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+
+# --- 1. Simulate Data for Multiple Locations ---
+
+np.random.seed(42)
+n_locations = 3
+n_months = 120
+months = pd.date_range(start='2012-01-01', periods=n_months, freq='M')
+leak_months = [20, 45, 70, 95]
+
+data_all = []
+
+for loc in range(n_locations):
+    base_flux = 50 + 5 * np.sin(np.linspace(0, 10 * np.pi, n_months)) + np.random.normal(0, 2, n_months)
+    loc_flux = base_flux + np.random.normal(0, 2, n_months)
+
+    for lm in leak_months:
+        influence = np.exp(-abs(loc - 1))  # more impact near location 1
+        loc_flux[lm - 2:lm] += np.linspace(3, 8, 2) * influence
+        loc_flux[lm] += 20 * influence
+        loc_flux[lm + 1:lm + 3] += np.linspace(8, 3, 2) * influence
+
+    df = pd.DataFrame({'month': months, 'flux': loc_flux})
+    df['flux_anomaly'] = df['flux'] - df['flux'].rolling(12, center=True).mean()
+    df['d_flux'] = df['flux_anomaly'].diff()
+    df['seam_depth'] = 300 + 30 * np.sin(np.linspace(0, 12, n_months)) + 5 * loc
+    df['porosity'] = 0.05 + 0.01 * np.cos(np.linspace(0, 6, n_months)) - 0.001 * loc
+    df['fault_proximity'] = np.clip(np.random.uniform(0, 1, n_months) + 0.1 * (loc - 1), 0, 1)
+
+    # Physics-based gas transport
+    permeability = np.random.uniform(1e-15, 1e-13, n_months)
+    viscosity = 1.1e-5
+    pressure_gradient = np.random.uniform(10, 50, n_months)
+    df['gas_transport'] = (permeability * df['porosity'] * pressure_gradient) / (df['seam_depth'] * viscosity)
+
+    df['leak'] = 0
+    for lm in leak_months:
+        df.loc[df.index[lm - 2:lm + 1], 'leak'] = 1
+    df['location'] = loc
+    data_all.append(df)
+
+df_all = pd.concat(data_all).dropna()
+
+# --- 2. Train AI Model on All Locations ---
+
+features = ['flux', 'flux_anomaly', 'd_flux', 'seam_depth', 'porosity', 'fault_proximity', 'gas_transport']
+X = df_all[features]
+y = df_all['leak']
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X, y)
+df_all['ai_physics_pred'] = model.predict(X)
+
+# --- 3. Traditional Threshold Method Per Location ---
+
+threshold_preds = []
+for loc in df_all['location'].unique():
+    sub = df_all[df_all['location'] == loc].copy()
+    threshold = sub['flux'].mean() + 2.5 * sub['flux'].std()
+    sub['threshold_pred'] = (sub['flux'] > threshold).astype(int)
+    threshold_preds.append(sub[['month', 'location', 'threshold_pred']])
+
+threshold_df = pd.concat(threshold_preds).reset_index(drop=True)
+df_all = df_all.reset_index(drop=True).merge(threshold_df, on=['month', 'location'])
+
+# --- 4. Evaluation ---
+
+ai_report = classification_report(df_all['leak'], df_all['ai_physics_pred'], output_dict=True)
+threshold_report = classification_report(df_all['leak'], df_all['threshold_pred'], output_dict=True)
+
+# Lead time
+lead_times = []
+for loc in range(n_locations):
+    df_loc = df_all[df_all['location'] == loc]
+    for lm in leak_months:
+        idx_start = df_loc.index[df_loc['month'] == months[lm - 2]].tolist()[0]
+        window = df_loc.iloc[idx_start:idx_start + 3]
+        ai_hits = window[window['ai_physics_pred'] == 1]
+        if not ai_hits.empty:
+            lead_time = lm - df_loc.index.get_loc(ai_hits.index[0])
+            lead_times.append(lead_time)
+
+avg_lead_time = np.mean(lead_times) if lead_times else 0
+
+# --- 5. Visualization ---
+
+fig, axs = plt.subplots(n_locations, 1, figsize=(14, 4 * n_locations), sharex=True)
+for i, loc in enumerate(range(n_locations)):
+    df_plot = df_all[df_all['location'] == loc]
+    axs[i].plot(df_plot['month'], df_plot['flux'], label='Methane Flux', color='gray')
+    axs[i].scatter(df_plot[df_plot['leak'] == 1]['month'], df_plot[df_plot['leak'] == 1]['flux'],
+                   color='red', label='Leak (True)', zorder=5)
+    axs[i].scatter(df_plot[df_plot['ai_physics_pred'] == 1]['month'], df_plot[df_plot['ai_physics_pred'] == 1]['flux'],
+                   marker='x', color='green', label='AI Prediction', zorder=5)
+    axs[i].scatter(df_plot[df_plot['threshold_pred'] == 1]['month'], df_plot[df_plot['threshold_pred'] == 1]['flux'],
+                   marker='o', facecolors='none', edgecolors='blue', label='Threshold Detection', zorder=5)
+    axs[i].set_title(f"Location {loc}")
+    axs[i].set_ylabel("Flux")
+    axs[i].legend()
+    axs[i].grid(True)
+
+plt.xlabel("Date")
+plt.tight_layout()
+plt.show()
+
+# --- 6. Print Results ---
+
+print("\n=== Physics-Guided AI ===")
+print(classification_report(df_all['leak'], df_all['ai_physics_pred']))
+print("\n=== Traditional Threshold ===")
+print(classification_report(df_all['leak'], df_all['threshold_pred']))
+print(f"\nAverage AI Lead Time (months): {avg_lead_time:.2f}")
