@@ -29,6 +29,7 @@ This repository presents physics-boosted AI methods for early detection of metha
 ├── data/                            # Folder for future real-world data
 │   ├── EPA_methane_flux.nc          # Placeholder NetCDF file (not included)
 │   └── gis_shapefiles/              # Placeholder for geological shapefiles
+├── LICENSE
 ```
 
 ---
