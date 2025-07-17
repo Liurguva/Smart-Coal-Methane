@@ -1,17 +1,19 @@
 # Physics-Boosted AI for Proactive Methane Leak Detection in Coal Mines
 
 ## Overview
-This project demonstrates a physics-guided machine learning approach for early detection of methane leaks in coal mines. Traditional threshold-based methods detect leaks only after they become severe, while our model integrates domain knowledge, sensor data, and site-specific geological features to detect precursors, allowing proactive intervention.
+This project demonstrates a physics-guided machine learning approach for early detection of methane leaks in coal mines. Traditional threshold-based methods detect leaks only after they become severe, while our models integrate domain knowledge, sensor data, site-specific geological features, and even inverse physics modeling to detect precursors, allowing proactive intervention.
 
 ---
 
 ## 🔍 Features
 - Physics-informed feature engineering (flux anomaly, rate of change, seam depth, porosity, fault proximity)
 - Leak simulation with precursor signals for realistic benchmarking
-- Random Forest classifier trained to detect early warning signs of leaks
+- Random Forest and Physics-Informed Neural Network (PINN) classifiers
+- Inverse analysis to infer unknown material properties (permeability, viscosity) and physics laws
+- Multi-location modeling to capture inter-site gas transfer behavior
 - Comparison with traditional threshold detection methods
 - Performance metrics including classification reports and average proactive lead time
-- Visualizations for time series and predictions
+- Visualizations for time series and predictions across locations
 
 ---
 
@@ -32,20 +34,34 @@ This project demonstrates a physics-guided machine learning approach for early d
 ---
 
 ## ⚙️ Installation
-This code requires Python 3.7+ and the following packages:
+This project requires Python 3.7+ and the following packages:
 ```bash
-pip install numpy pandas matplotlib scikit-learn
+pip install numpy pandas matplotlib scikit-learn torch
+```
+
+For CPU-only environments:
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 ```
 
 ---
 
 ## 🚀 Getting Started
-1. Clone this repository  
-2. Run the example script:
+
+Run any script depending on your objective:
+
+### Single-Location Examples
 ```bash
-python enhanced_methane_leak_ai.py
+python Single-Known-Material.py
+python Single-Known-Material-Mechanism.py
+python Single-Unknown-Material-Mechanism.py
 ```
-3. Review the printed performance metrics and view the plotted results
+
+### Multi-Location Examples
+```bash
+python Multiple-Known-Material-Mechanism.py
+python Multiple-Unknown-Material-Mechanism.py
+```
 
 ---
 
@@ -64,52 +80,77 @@ F1-score:  0.55
 Avg. AI Lead Time: 1.75 months
 ```
 
-The AI model accurately detects precursor conditions 1–2 months before the traditional system would react.
+```
+=== Inverse Modeling ===
+Precision: 1.00
+Recall:    0.97
+F1-score:  0.98
+
+Learned Parameters:
+Permeability: 1.65e-13 m²
+Viscosity:    2.21e-05 Pa·s
+Pressure factor: 0.105
+
+Average Lead Time: 9.00 months
+```
 
 ---
 
 ## 📈 Visualization
-- Green `X`: AI predictions  
-- Red dots: Ground truth leak periods (including precursors)  
-- Blue circles: Threshold-based detections (reactive)  
-
-The AI model consistently outperforms the baseline by both accuracy and timing.
+Each script produces time series plots by location:
+- **Green `X`**: AI predictions  
+- **Red dots**: Ground truth leak periods (including precursors)  
+- **Blue circles**: Threshold-based detections
 
 ---
 
 ## 📚 Theory
-**Traditional Detection:** Relies on thresholds for methane flow/concentration, but lacks adaptability and is reactive.
 
-**Physics-Guided AI:** Incorporates knowledge of methane emission dynamics in geological formations:
-- **Flux anomaly** = difference from long-term moving average  
-- **Rate of change** = first derivative of anomaly  
-- **Seam depth and porosity** affect accumulation and flow  
-- **Fault proximity** increases emission risk  
+### Traditional Detection
+- Based on thresholds of methane concentration
+- Misses early signals and has low recall
 
-These features are used to train a classifier that anticipates leak events.
+### Physics-Boosted AI
+- Uses geophysical knowledge like:
+  - **Flux anomaly**: deviation from rolling average
+  - **Rate of change**: slope of anomaly
+  - **Seam depth**, **porosity**, **fault proximity**
+- Optional physics equation:
+  \[
+  \text{Transport} = \frac{{\text{Permeability} \times \text{Porosity} \times \Delta P}}{{\text{Depth} \times \text{Viscosity}}}
+  \]
+
+### Inverse Modeling
+- Learns unknown material properties using PyTorch and differentiable modeling
+- Enables real-time adaptation to new environments
 
 ---
 
 ## 🛠️ Customization
-To apply this to real-world sites:
-- Replace simulated data with field sensor data and GIS layers
-- Use the `data/` folder for inputs like:
-  - EPA gridded CH₄ datasets (NetCDF)
-  - Virginia geological shapefiles (e.g., fault lines, coal seams)
-- Extend the ML pipeline with temporal models (e.g., LSTM, probabilistic models)
+To use with real mine data:
+- Replace synthetic data with field sensor logs
+- Use `data/` folder for:
+  - Satellite CH₄ flux (NetCDF)
+  - Geological shapefiles (e.g., fault zones)
+- Extend models with:
+  - LSTM/RNN for sequence memory
+  - Bayesian neural nets for uncertainty
 
 ---
 
 ## 📌 Roadmap
-- [ ] Integrate real-time GIS inputs  
-- [ ] Incorporate LSTM for sequential prediction  
-- [ ] Build a Streamlit web dashboard  
-- [ ] Support uncertainty quantification and early warning thresholds  
+- [x] Single-location models with known physics
+- [x] Multi-location gas transport integration
+- [x] Inverse modeling for unknown physics
+- [ ] Real-time data ingestion
+- [ ] LSTM-based sequential learning
+- [ ] Streamlit dashboard
+- [ ] Geospatial mapping of risk zones
 
 ---
 
 ## 🤝 Contributing
-We welcome feedback, real-world datasets, or collaborations to improve and extend the tool.
+We welcome real-world data, code enhancements, or collaboration from mine operators and researchers.
 
 ---
 
@@ -120,6 +161,6 @@ MIT License. See `LICENSE` file for details.
 
 ## 📬 Contact
 Lead developer: **Leo Liu**, University of Virginia  
-Email: `liurguva@gmail.com`  
+Email: `liurguva@gmail.com`
 
-This project was developed to support coal mine methane management and research initiatives in Virginia and beyond.
+This project supports coal mine methane management and safety through proactive, physics-guided AI modeling.
